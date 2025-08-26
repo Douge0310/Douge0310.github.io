@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大五人格简易自评量表</title>
+    <!-- 引入Tailwind CSS实现响应式样式 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome图标增强视觉 -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans max-w-4xl mx-auto p-4 md:p-6">
+    <!-- 1. 核心答题进度提示区域（新增+强化） -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6 sticky top-0 z-10">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+            <!-- 进度标题 -->
+            <div class="flex items-center text-blue-700">
+                <i class="fa fa-list-ol mr-2"></i>
+                <h2 class="font-semibold text-lg">量表答题进度</h2>
+            </div>
+            
+            <!-- 题数统计（已答/剩余） -->
+            <div class="flex gap-6 text-center">
+                <div>
+                    <p class="text-xs text-gray-500 mb-1">已答题</p>
+                    <p id="answeredNum" class="font-bold text-lg text-blue-700">0</p>
+                </div>
+                <div class="text-gray-400">/</div>
+                <div>
+                    <p class="text-xs text-gray-500 mb-1">总题数</p>
+                    <p class="font-bold text-lg text-gray-700">40</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 mb-1">剩余题</p>
+                    <p id="remainingNum" class="font-bold text-lg text-orange-600">40</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 可视化进度条 -->
+        <div class="w-full bg-gray-200 rounded-full h-3 mt-3 overflow-hidden">
+            <div id="progressBar" class="bg-blue-700 h-full rounded-full transition-all duration-500 ease-in-out" style="width: 0%"></div>
+        </div>
+        
+        <!-- 进度百分比+状态提示 -->
+        <div class="flex justify-between items-center mt-2">
+            <p id="progressPercent" class="text-sm font-medium text-blue-700">0%</p>
+            <p id="progressStatus" class="text-sm text-gray-500">请开始答题</p>
+        </div>
+    </div>
+
+    <!-- 2. 标题与指导语区域 -->
+    <div class="bg-white rounded-lg shadow-md p-5 mb-6">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-blue-700 mb-4">大五人格简易自评量表 (40题)</h1>
+        <div class="text-gray-600 text-sm md:text-base">
+            <p class="font-semibold">指导语：</p>
+            <p>请仔细阅读每一项描述，根据与你日常情况的相符程度评分（1=非常不符合，2=不太符合，3=不确定，4=比较符合，5=非常符合）。答案无对错，按真实感受作答即可。</p>
+        </div>
+    </div>
+
+    <!-- 3. 题目容器（JS动态渲染） -->
+    <div id="questionContainer" class="bg-white rounded-lg shadow-md p-5 mb-6">
+        <!-- 题目将在页面加载后自动生成 -->
+    </div>
+
+    <!-- 4. 提交按钮 -->
+    <div class="text-center mb-6">
+        <button id="submitBtn" class="bg-blue-700 text-white px-8 py-3 rounded-md hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-base md:text-lg">
+            提交测试
+        </button>
+    </div>
+
+    <!-- 5. 结果展示区域（初始隐藏） -->
+    <div id="resultContainer" class="bg-white rounded-lg shadow-md p-5 mb-6 hidden">
+        <h2 class="text-2xl font-bold text-center text-blue-700 mb-4">你的大五人格测试结果</h2>
+        <div id="resultContent" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 结果将在提交后动态渲染 -->
+        </div>
+    </div>
+
+    <script>
+        // 量表核心数据：40道题目（每维度8题，含反向计分标记）
+        const questions = [
+            { id: 1, text: "我常常感到精力充沛、充满活力。", dimension: "E", isReverse: false },
+            { id: 2, text: "我很容易感到不安、紧张或烦恼。", dimension: "N", isReverse: false },
+            { id: 3, text: "我对艺术和自然的美有强烈的感受力。", dimension: "O", isReverse: false },
+            { id: 4, text: "我总是信任他人，相信人们本质上是善良的。", dimension: "A", isReverse: false },
+            { id: 5, text: "我在开始一项任务前会仔细规划和准备。", dimension: "C", isReverse: false },
+            { id: 6, text: "我常常在社交场合中感到害羞和拘谨。", dimension: "E", isReverse: true },
+            { id: 7, text: "我很少感到忧郁或沮丧。", dimension: "N", isReverse: true },
+            { id: 8, text: "我不喜欢玩“脑筋急转弯”或抽象的游戏。", dimension: "O", isReverse: true },
+            { id: 9, text: "我有时会觉得他人是在利用我。", dimension: "A", isReverse: true },
+            { id: 10, text: "我的工作或学习空间常常比较凌乱。", dimension: "C", isReverse: true },
+            { id: 11, text: "我常常是聚会的灵魂人物。", dimension: "E", isReverse: false },
+            { id: 12, text: "我能很好地处理压力。", dimension: "N", isReverse: true },
+            { id: 13, text: "我对哲学和理论问题的讨论很感兴趣。", dimension: "O", isReverse: false },
+            { id: 14, text: "我总是体贴周到、彬彬有礼地对待他人。", dimension: "A", isReverse: false },
+            { id: 15, text: "我注重细节，追求把事情做得很完美。", dimension: "C", isReverse: false },
+            { id: 16, text: "我喜欢置身于热闹的人群之中。", dimension: "E", isReverse: false },
+            { id: 17, text: "我常常感到无助，希望有人能帮我解决问题。", dimension: "N", isReverse: false },
+            { id: 18, text: "我不喜欢读小说或诗歌。", dimension: "O", isReverse: true },
+            { id: 19, text: "我更倾向于与他人合作，而不是与人竞争。", dimension: "A", isReverse: false },
+            { id: 20, text: "我经常忘记把东西放回原处。", dimension: "C", isReverse: true },
+            { id: 21, text: "我很少主动和别人说话。", dimension: "E", isReverse: true },
+            { id: 22, text: "我常常感到紧张不安、提心吊胆。", dimension: "N", isReverse: false },
+            { id: 23, text: "我觉得探索新的想法、学习新东西是令人兴奋的。", dimension: "O", isReverse: false },
+            { id: 24, text: "我认为大多数人基本上是诚实的。", dimension: "A", isReverse: false },
+            { id: 25, text: "我非常有条理，做事很有章法。", dimension: "C", isReverse: false },
+            { id: 26, text: "我觉得自己比别人更有能力、更有干劲。", dimension: "E", isReverse: false },
+            { id: 27, text: "我很少感到愤怒或暴躁。", dimension: "N", isReverse: true },
+            { id: 28, text: "我欣赏艺术、音乐或诗歌表演。", dimension: "O", isReverse: false },
+            { id: 29, text: "当有人请求帮助时，我总会尽力相助。", dimension: "A", isReverse: false },
+            { id: 30, text: "对于分配给我的任务，我会坚持做完，即使它很枯燥。", dimension: "C", isReverse: false },
+            { id: 31, text: "在社交场合中，我更喜欢倾听，而不是成为关注的中心。", dimension: "E", isReverse: true },
+            { id: 32, text: "我的情绪波动很大。", dimension: "N", isReverse: false },
+            { id: 33, text: "我喜欢变化和多样化的生活方式，讨厌一成不变。", dimension: "O", isReverse: false },
+            { id: 34, text: "为了取胜或获得优势，我有时会利用别人。", dimension: "A", isReverse: true },
+            { id: 35, text: "在做决定时，我会考虑所有的事实和可能性。", dimension: "C", isReverse: false },
+            { id: 36, text: "我健谈，喜欢与人打交道。", dimension: "E", isReverse: false },
+            { id: 37, text: "我经常感到忧虑或悲观。", dimension: "N", isReverse: false },
+            { id: 38, text: "我相信应该对不同的价值观和想法保持开放的心态。", dimension: "O", isReverse: false },
+            { id: 39, text: "我总是尝试尊重他人的感受。", dimension: "A", isReverse: false },
+            { id: 40, text: "一旦做出承诺，我通常都会坚持到底。", dimension: "C", isReverse: false }
+        ];
+
+        // 大五人格维度配置：名称+高低分特征描述
+        const dimensionConfig = {
+            E: { name: "外向性", highDesc: "健谈、精力充沛、乐于社交、享受焦点、自信主动", lowDesc: "安静、内敛、偏爱独处、社交易消耗、行动前深思" },
+            N: { name: "神经质/情绪稳定性", highDesc: "易焦虑、抑郁、愤怒，情绪波动大、对压力敏感", lowDesc: "情绪平稳、心态放松、抗压能力强、逆境中韧性高" },
+            O: { name: "开放性", highDesc: "想象力丰富、好奇心强、欣赏艺术、乐于尝新、价值观多元", lowDesc: "注重现实、偏爱常规、传统观念强、审美兴趣较局限" },
+            A: { name: "宜人性", highDesc: "乐于助人、信任他人、有同情心、擅长合作、待人谦逊", lowDesc: "关注自身利益、对他人存疑、竞争性强、敢于表达不同" },
+            C: { name: "尽责性", highDesc: "有条理、可靠负责、目标导向、自律性强、注重细节", lowDesc: "灵活随性、规划性弱、易分心、偏爱即兴、对规则要求低" }
+        };
+
+        // 页面元素获取（重点：进度相关元素）
+        const questionContainer = document.getElementById("questionContainer");
+        const submitBtn = document.getElementById("submitBtn");
+        const resultContainer = document.getElementById("resultContainer");
+        const resultContent = document.getElementById("resultContent");
+        // 进度提示相关元素
+        const answeredNumEl = document.getElementById("answeredNum");
+        const remainingNumEl = document.getElementById("remainingNum");
+        const progressBarEl = document.getElementById("progressBar");
+        const progressPercentEl = document.getElementById("progressPercent");
+        const progressStatusEl = document.getElementById("progressStatus");
+
+        // 1. 动态渲染40道题目
+        function renderQuestions() {
+            questions.forEach(question => {
+                const questionItem = document.createElement("div");
+                questionItem.className = "mb-8 pb-6 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0";
+                
+                // 单题结构（优化移动端点击体验）
+                questionItem.innerHTML = `
+                    <div class="flex items-start mb-4">
+                        <span class="font-semibold text-blue-700 mr-2">${question.id}.</span>
+                        <p class="text-base md:text-lg">${question.text} 
+                            <span class="ml-2 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">
+                                ${question.dimension}${question.isReverse ? "（反向）" : ""}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 sm:gap-4 ml-6">
+                        ${[1,2,3,4,5].map(score => `
+                            <label class="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 cursor-pointer rounded-md border hover:bg-blue-50 transition-colors">
+                                <input type="radio" name="q${question.id}" value="${score}" class="form-radio h-5 w-5 text-blue-700" required>
+                                <span class="ml-1 text-sm sm:text-base">${score}分</span>
+                            </label>
+                        `).join("")}
+                    </div>
+                `;
+                
+                questionContainer.appendChild(questionItem);
+            });
+
+            // 监听单选按钮变化，实时更新进度
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener("change", updateProgress);
+            });
+        }
+
+        // 2. 核心：实时更新答题进度（新增完整逻辑）
+        function updateProgress() {
+            // ① 计算基础进度数据
+            const answeredCount = document.querySelectorAll('input[type="radio"]:checked').length; // 已答题数
+            const remainingCount = questions.length - answeredCount; // 剩余题数
+            const progressPercent = Math.round((answeredCount / questions.length) * 100); // 进度百分比
+
+            // ② 更新进度UI显示
+            answeredNumEl.textContent = answeredCount;
+            remainingNumEl.textContent = remainingCount;
+            progressBarEl.style.width = `${progressPercent}%`;
+            progressPercentEl.textContent = `${progressPercent}%`;
+
+            // ③ 进度状态文本提示（根据进度动态变化）
+            let statusText = "";
+            if (answeredCount === 0) {
+                statusText = "请开始答题";
+            } else if (answeredCount < 10) {
+                statusText = "刚开始答题，继续加油！";
+            } else if (answeredCount < 20) {
+                statusText = "已完成四分之一，节奏不错～";
+            } else if (answeredCount < 30) {
+                statusText = "已完成一半，坚持下去！";
+            } else if (answeredCount < 40) {
+                statusText = "接近完成，再答几道就好！";
+            } else {
+                statusText = "所有题目已答完，可提交测试！";
+                progressBarEl.classList.remove("bg-blue-700");
+                progressBarEl.classList.add("bg-green-600"); // 进度条变绿色，提示完成
+            }
+            progressStatusEl.textContent = statusText;
+
+            // ④ 控制提交按钮状态（全部答完才启用）
+            submitBtn.disabled = answeredCount < questions.length;
+        }
+
+        // 3. 计算测试结果（保留原逻辑）
+        function calculateResult() {
+            const dimensionScores = { E: 0, N: 0, O: 0, A: 0, C: 0 };
+
+            questions.forEach(question => {
+                const selectedScore = parseInt(document.querySelector(`input[name="q${question.id}"]:checked`).value);
+                const finalScore = question.isReverse ? 6 - selectedScore : selectedScore;
+                dimensionScores[question.dimension] += finalScore;
+            });
+
+            const resultDetails = {};
+            for (const [dim, score] of Object.entries(dimensionScores)) {
+                const tendency = score <= 20 ? "低分端" : (score <= 29 ? "中等水平" : "高分端");
+                const desc = tendency === "高分端" ? dimensionConfig[dim].highDesc : dimensionConfig[dim].lowDesc;
+
+                resultDetails[dim] = {
+                    score,
+                    tendency,
+                    name: dimensionConfig[dim].name,
+                    desc
+                };
+            }
+
+            return resultDetails;
+        }
+
+        // 4. 渲染测试结果（保留原逻辑）
+        function renderResult(resultDetails) {
+            resultContent.innerHTML = "";
+            for (const [dim, detail] of Object.entries(resultDetails)) {
+                const resultCard = document.createElement("div");
+                resultCard.className = "border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow";
+                resultCard.innerHTML = `
+                    <h3 class="font-bold text-lg text-blue-700 mb-2">${detail.name}（${dim}）</h3>
+                    <p class="mb-1"><span class="font-semibold">总分：</span>${detail.score}分（满分40分）</p>
+                    <p class="mb-2"><span class="font-semibold">倾向：</span>${detail.tendency}</p>
+                    <p class="text-sm text-gray-600"><span class="font-semibold">核心特征：</span>${detail.desc}</p>
+                `;
+                resultContent.appendChild(resultCard);
+            }
+
+            resultContainer.classList.remove("hidden");
+            resultContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        // 5. 提交按钮事件
+        submitBtn.addEventListener("click", function() {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "处理结果中...";
+
+            try {
+                const resultDetails = calculateResult();
+                renderResult(resultDetails);
+            } catch (error) {
+                console.error("结果处理失败：", error);
+                alert("测试结果处理出错，请刷新页面重试！");
+                submitBtn.disabled = false;
+                submitBtn.textContent = "重新提交";
+            }
+        });
+
+        // 页面加载完成后渲染题目
+        window.addEventListener("DOMContentLoaded", renderQuestions);
+    </script>
+</body>
+</html>
